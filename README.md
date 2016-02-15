@@ -1,4 +1,4 @@
-# iOS---Threading
+
 ### 关于iOS的多线程
 在iOS中目前有4套多线程方案，他们分别是：</br>
 > Pthreads</br>
