@@ -337,8 +337,7 @@ for (NSInteger i = 0; i < 5; i++) {
     }];
 }
 //4.队列添加任务
-[queue addOperation:operation];
-</pre></br>
+[queue addOperation:operation];</pre></br>
 
 ​**打印输出**
 >2015-07-28 20:26:28.463 test[18622:4443534] <NSThread: 0x7fd022c3ac10>{number = 5, name = (null)}</br>
@@ -376,8 +375,8 @@ NSBlockOperation *operation3 = [NSBlockOperation blockOperationWithBlock:^{
 [operation3 addDependency:operation2];      //任务三依赖任务二
 //5.创建队列并加入任务
 NSOperationQueue *queue = [[NSOperationQueue alloc] init];
-[queue addOperations:@[operation3, operation2, operation1] waitUntilFinished:NO];
-</pre></br>
+[queue addOperations:@[operation3, operation2, operation1] waitUntilFinished:NO];</pre></br>
+
 
 ####打印结果
 >2015-07-28 21:24:28.622 test[19392:4637517] 下载图片 - <NSThread: 0x7fc10ad4d970>{number = 2, name = (null)}</br>
