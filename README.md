@@ -248,3 +248,54 @@ dispatch_group_notify(group, dispatch_get_main_queue(), ^{
 `func dispatch_barrier_sync(_ queue: dispatch_queue_t, _ block: dispatch_block_t)`:
 这个方法的使用和上一个一样，传入 自定义的并发队列`（DISPATCH_QUEUE_CONCURRENT）`，它和上一个方法一样的阻塞 `queue`，不同的是 这个方法还会 阻塞当前线程。
 如果你传入的是其他的 `queue`, 那么它就和 `dispatch_sync` 一样了。
+
+##NSOperation和NSOperationQueue
+NSOperation 是苹果公司对 GCD 的封装，完全面向对象，所以使用起来更好理解。 大家可以看到 NSOperation 和 NSOperationQueue 分别对应 GCD 的 任务 和 队列 。操作步骤也很好理解：
+
+1，将要执行的任务封装到一个 NSOperation 对象中。</br>
+2，将此任务添加到一个 NSOperationQueue 对象中。
+
+然后系统就会自动在执行任务。至于同步还是异步、串行还是并行请继续往下看：
+
+###添加任务
+值得说明的是，`NSOperation` 只是一个抽象类，所以不能封装任务。但它有 2 个子类用于封装任务。分别是：`NSInvocationOperation` 和 `NSBlockOperation` 。创建一个 `Operation` 后，需要调用 `start` 方法来启动任务，它会 默认在当前队列同步执行。当然你也可以在中途取消一个任务，只需要调用其 cancel 方法即可。
+
+* NSInvocationOperation : 需要传入一个方法名。
+<pre>
+//1.创建NSInvocationOperation对象
+	    NSInvocationOperation *operation = [[NSInvocationOperation alloc] initWithTarget:self selector:@selector(run) object:nil];
+//2.开始执行
+	  [operation start];
+	  </pre>
+* NSBlockOperation
+<pre>
+//1.创建NSBlockOperation对象
+  NSBlockOperation *operation = [NSBlockOperation blockOperationWithBlock:^{
+      NSLog(@"%@", [NSThread currentThread]);
+  }];
+  //2.开始任务
+  [operation start];
+</pre>	  
+之前说过这样的任务，默认会在当前线程执行。但是 `NSBlockOperation` 还有一个方法：`addExecutionBlock:` ，通过这个方法可以给 `Operation `添加多个执行`Block`。这样 `Operation` 中的任务 会并发执行，它会 在主线程和其它的多个线程 执行这些任务，注意下面的打印结果：
+<pre>
+    //1.创建NSBlockOperation对象
+      NSBlockOperation *operation = [NSBlockOperation blockOperationWithBlock:^{
+          NSLog(@"%@", [NSThread currentThread]);
+      }];
+      //添加多个Block
+      for (NSInteger i = 0; i < 5; i++) {
+          [operation addExecutionBlock:^{
+              NSLog(@"第%ld次：%@", i, [NSThread currentThread]);
+          }];
+      }
+      //2.开始任务
+      [operation start];
+</pre></br>
+>###打印输出
+2015-07-28 17:50:16.585 test[17527:4095467] 第2次 - <NSThread: 0x7ff5c9701910>{number = 1, name = main}</br>
+2015-07-28 17:50:16.585 test[17527:4095666] 第1次 - <NSThread: 0x7ff5c972caf0>{number = 4, name = (null)}</br>
+2015-07-28 17:50:16.585 test[17527:4095665] <NSThread: 0x7ff5c961b610>{number = 3, name = (null)}</br>
+2015-07-28 17:50:16.585 test[17527:4095662] 第0次 - <NSThread: 0x7ff5c948d310>{number = 2, name = (null)}</br>
+2015-07-28 17:50:16.586 test[17527:4095666] 第3次 - <NSThread: 0x7ff5c972caf0>{number = 4, name = (null)}</br>
+2015-07-28 17:50:16.586 test[17527:4095467] 第4次 - <NSThread: 0x7ff5c9701910>{number = 1, name = main}</br>
+​
