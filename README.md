@@ -379,7 +379,9 @@ NSOperationQueue *queue = [[NSOperationQueue alloc] init];
 [queue addOperations:@[operation3, operation2, operation1] waitUntilFinished:NO];
 </pre></br>
 
+
 **打印结果**
+
 >2015-07-28 21:24:28.622 test[19392:4637517] 下载图片 - <NSThread: 0x7fc10ad4d970>{number = 2, name = (null)}</br>
 2015-07-28 21:24:29.622 test[19392:4637515] 打水印 - <NSThread: 0x7fc10af20ef0>{number = 3, name = (null)}</br>
 2015-07-28 21:24:30.627 test[19392:4637515] 上传图片 - <NSThread: 0x7fc10af20ef0>{number = 3, name = (null)}</br>
