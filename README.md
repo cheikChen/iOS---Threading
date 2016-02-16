@@ -152,7 +152,7 @@ dispatch_sync(<#queue#>, ^{
 以下代码在主线程调用，结果是什么？</br>
 <pre>
 NSLog("之前 - %@", NSThread.currentThread())
-dispatch\_sync(dispatch\_get\_main\_queue(), { () -> Void in 
+dispatch_sync(dispatch_get_main_queue(), { () -> Void in 
         NSLog("sync - %@", NSThread.currentThread())
 })
 NSLog("之后 - %@", NSThread.currentThread())
@@ -193,9 +193,9 @@ let queue = dispatch_queue_create("myQueue", DISPATCH_QUEUE_SERIAL)
 队列组可以将很多队列添加到一个组里，这样做的好处是，当这个组里所有的任务都执行完了，队列组会通过一个方法通知我们。下面是使用方法，这是一个很实用的功能。
 <pre>
 //1.创建队列组
-dispatch\_group\_t group = dispatch\_group\_create();
+dispatch_group_t group = dispatch_group_create();
 //2.创建队列
-dispatch\_queue\_t queue = dispatch\_get\_global\_queue(DISPATCH\_QUEUE\_PRIORITY\_DEFAULT, 0);
+dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
 //3.多次使用队列组的方法执行任务, 只有异步方法
 //3.1.执行3次循环
 dispatch_group_async(group, queue, ^{
@@ -204,19 +204,19 @@ dispatch_group_async(group, queue, ^{
     }
 });
 //3.2.主队列执行8次循环
-dispatch\_group\_async(group, dispatch\_get\_main\_queue(), ^{
+dispatch_group_async(group, dispatch_get_main_queue(), ^{
     for (NSInteger i = 0; i < 8; i++) {
         NSLog(@"group-02 - %@", [NSThread currentThread]);
     }
 });
 //3.3.执行5次循环
-dispatch\_group\_async(group, queue, ^{
+dispatch_group_async(group, queue, ^{
     for (NSInteger i = 0; i < 5; i++) {
         NSLog(@"group-03 - %@", [NSThread currentThread]);
     }
 });
 //4.都完成后会自动通知
-dispatch\_group\_notify(group, dispatch\_get\_main\_queue(), ^{
+dispatch_group_notify(group, dispatch_get_main_queue(), ^{
     NSLog(@"完成 - %@", [NSThread currentThread]);
 });
 </pre>
