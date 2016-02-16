@@ -291,6 +291,7 @@ NSOperation 是苹果公司对 GCD 的封装，完全面向对象，所以使用
       //2.开始任务
       [operation start];
 </pre></br>
+
 >###打印输出
 2015-07-28 17:50:16.585 test[17527:4095467] 第2次 - <NSThread: 0x7ff5c9701910>{number = 1, name = main}</br>
 2015-07-28 17:50:16.585 test[17527:4095666] 第1次 - <NSThread: 0x7ff5c972caf0>{number = 4, name = (null)}</br>
@@ -298,4 +299,238 @@ NSOperation 是苹果公司对 GCD 的封装，完全面向对象，所以使用
 2015-07-28 17:50:16.585 test[17527:4095662] 第0次 - <NSThread: 0x7ff5c948d310>{number = 2, name = (null)}</br>
 2015-07-28 17:50:16.586 test[17527:4095666] 第3次 - <NSThread: 0x7ff5c972caf0>{number = 4, name = (null)}</br>
 2015-07-28 17:50:16.586 test[17527:4095467] 第4次 - <NSThread: 0x7ff5c9701910>{number = 1, name = main}</br>
-​
+
+NOTE：addExecutionBlock 方法必须在 start() 方法之前执行，否则就会报错：
+
+>‘*** -[NSBlockOperation addExecutionBlock:]: blocks cannot be added after the operation has started executing or finished'
+
+###自定义Operation
+
+除了上面的两种 Operation 以外，我们还可以自定义 Operation。自定义 Operation 需要继承 NSOperation 类，并实现其 main() 方法，因为在调用 start() 方法的时候，内部会调用 main() 方法完成相关逻辑。所以如果以上的两个类无法满足你的欲望的时候，你就需要自定义了。你想要实现什么功能都可以写在里面。除此之外，你还需要实现 cancel() 在内的各种方法。所以这个功能提供给高级玩家，我在这里就不说了，等我需要用到时在研究它，到时候可能会再做更新。
+
+###创建队列
+看过上面的内容就知道，我们可以调用一个 `NSOperation` 对象的 `start()` 方法来启动这个任务，但是这样做他们默认是 同步执行 的。就算是 `addExecutionBlock `方法，也会在 当前线程和其他线程 中执行，也就是说还是会占用当前线程。这是就要用到队列 `NSOperationQueue` 了。而且，按类型来说的话一共有两种类型：主队列、其他队列。只要添加到队列，会自动调用任务的 `start()` 方法
+
+* 主队列</br>
+ 细心的同学就会发现，每套多线程方案都会有一个主线程（当然啦，说的是iOS中，像 pthread 这种多系统的方案并没有，因为 UI线程 理论需要每种操作系统自己定制）。这是一个特殊的线程，必须串行。所以添加到主队列的任务都会一个接一个地排着队在主线程处理。
+<pre>
+//OBJECTIVE-C
+NSOperationQueue *queue = [NSOperationQueue mainQueue];
+</pre>
+
+###其他队列
+
+因为主队列比较特殊，所以会单独有一个类方法来获得主队列。那么通过初始化产生的队列就是其他队列了，因为只有这两种队列，除了主队列，其他队列就不需要名字了。
+
+注意：其他队列的任务会在其他线程并行执行。
+<pre>
+//1.创建一个其他队列    
+NSOperationQueue *queue = [[NSOperationQueue alloc] init];
+//2.创建NSBlockOperation对象
+NSBlockOperation *operation = [NSBlockOperation blockOperationWithBlock:^{
+    NSLog(@"%@", [NSThread currentThread]);
+}];
+//3.添加多个Block
+for (NSInteger i = 0; i < 5; i++) {
+    [operation addExecutionBlock:^{
+        NSLog(@"第%ld次：%@", i, [NSThread currentThread]);
+    }];
+}
+//4.队列添加任务
+[queue addOperation:operation];
+</pre></br>
+
+​**打印输出**
+>2015-07-28 20:26:28.463 test[18622:4443534] <NSThread: 0x7fd022c3ac10>{number = 5, name = (null)}</br>
+2015-07-28 20:26:28.463 test[18622:4443536] 第2次 - <NSThread: 0x7fd022e36d50>{number = 2, name = (null)}</br>
+2015-07-28 20:26:28.463 test[18622:4443535] 第0次 - <NSThread: 0x7fd022f237f0>{number = 4, name = (null)}</br>
+2015-07-28 20:26:28.463 test[18622:4443533] 第1次 - <NSThread: 0x7fd022d372b0>{number = 3, name = (null)}</br>
+2015-07-28 20:26:28.463 test[18622:4443534] 第3次 - <NSThread: 0x7fd022c3ac10>{number = 5, name = (null)}</br>
+2015-07-28 20:26:28.463 test[18622:4443536] 第4次 - <NSThread: 0x7fd022e36d50>{number = 2, name = (null)}</br>
+
+OK, 这时应该发问了，大家将 `NSOperationQueue` 与 `GCD`的队列 相比较就会发现，这里没有串行队列，那如果我想要10个任务在其他线程串行的执行怎么办？
+
+这就是苹果封装的妙处，你不用管串行、并行、同步、异步这些名词。`NSOperationQueue` 有一个参数` maxConcurrentOperationCount` 最大并发数，用来设置最多可以让多少个任务同时执行。当你把它设置为 1 的时候，他不就是串行了嘛！
+
+`NSOperationQueue `还有一个添加任务的方法，`- (void)addOperationWithBlock:(void (^)(void))block;` ，这是不是和 GCD 差不多？这样就可以添加一个任务到队列中了，十分方便。
+
+`NSOperation` 有一个非常实用的功能，那就是添加依赖。比如有 3 个任务：A: 从服务器上下载一张图片，B：给这张图片加个水印，C：把图片返回给服务器。这时就可以用到依赖了:
+<pre>
+//1.任务一：下载图片
+NSBlockOperation *operation1 = [NSBlockOperation blockOperationWithBlock:^{
+    NSLog(@"下载图片 - %@", [NSThread currentThread]);
+    [NSThread sleepForTimeInterval:1.0];
+}];
+//2.任务二：打水印
+NSBlockOperation *operation2 = [NSBlockOperation blockOperationWithBlock:^{
+    NSLog(@"打水印   - %@", [NSThread currentThread]);
+    [NSThread sleepForTimeInterval:1.0];
+}];
+//3.任务三：上传图片
+NSBlockOperation *operation3 = [NSBlockOperation blockOperationWithBlock:^{
+    NSLog(@"上传图片 - %@", [NSThread currentThread]);
+    [NSThread sleepForTimeInterval:1.0];
+}];
+//4.设置依赖
+[operation2 addDependency:operation1];      //任务二依赖任务一
+[operation3 addDependency:operation2];      //任务三依赖任务二
+//5.创建队列并加入任务
+NSOperationQueue *queue = [[NSOperationQueue alloc] init];
+[queue addOperations:@[operation3, operation2, operation1] waitUntilFinished:NO];
+</pre></br>
+
+**打印结果**
+>2015-07-28 21:24:28.622 test[19392:4637517] 下载图片 - <NSThread: 0x7fc10ad4d970>{number = 2, name = (null)}</br>
+2015-07-28 21:24:29.622 test[19392:4637515] 打水印 - <NSThread: 0x7fc10af20ef0>{number = 3, name = (null)}</br>
+2015-07-28 21:24:30.627 test[19392:4637515] 上传图片 - <NSThread: 0x7fc10af20ef0>{number = 3, name = (null)}</br>
+
+* 注意：不能添加相互依赖，会死锁，比如 A依赖B，B依赖A。
+* 可以使用 removeDependency 来解除依赖关系。
+* 可以在不同的队列之间依赖，反正就是这个依赖是添加到任务身上的，和队列没关系。
+
+###其他方法
+以上就是一些主要方法, 下面还有一些常用方法需要大家注意：
+
+* NSOperation
+
+>BOOL executing; //判断任务是否正在执行</BR>
+BOOL finished; //判断任务是否完成</BR>
+void (^completionBlock)(void); //用来设置完成后需要执行的操作</BR>
+- (void)cancel; //取消任务</BR>
+- (void)waitUntilFinished; //阻塞当前线程直到此任务执行完毕</BR>
+
+* NSOperationQueue
+
+>NSUInteger operationCount; //获取队列的任务数
+- (void)cancelAllOperations; //取消队列中所有的任务
+- (void)waitUntilAllOperationsAreFinished; //阻塞当前线程直到此队列中的所有任务执行完毕
+[queue setSuspended:YES]; // 暂停queue
+[queue setSuspended:NO]; // 继续queue
+
+好啦，到这里差不多就讲完了。当然，我讲的并不完整，可能有一些知识我并没有讲到，但作为常用方法，这些已经足够了。不过我在这里只是告诉你了一些方法的功能，只是怎么把他们用到合适的地方，就需要多多实践了。下面我会说一些关于多线程的案例，是大家更加什么地了解。
+
+###其他用法
+在这部分，我会说一些和多线程知识相关的案例，可能有些很简单，大家早都知道的，不过因为这篇文章讲的是多线程嘛，所以应该尽可能的全面嘛。还有就是，我会尽可能的使用多种方法实现，让大家看看其中的区别。
+
+##线程同步
+所谓线程同步就是为了防止多个线程抢夺同一个资源造成的数据安全问题，所采取的一种措施。当然也有很多实现方法，请往下看：
+
+* 互斥锁 ：给需要同步的代码块加一个互斥锁，就可以保证每次只有一个线程访问此代码块。
+
+<PRE>@synchronized(self) {
+    //需要执行的代码块
+}</PRE>
+
+* 同步执行 ：我们可以使用多线程的知识，把多个线程都要执行此段代码添加到同* 一个串行队列，这样就实现了线程同步的概念。当然这里可以使用 GCD 和 `NSOperation` 两种方案，我都写出来。
+
+<PRE>
+//GCD
+  //需要一个全局变量queue，要让所有线程的这个操作都加到一个queue中
+  dispatch_sync(queue, ^{
+      NSInteger ticket = lastTicket;
+      [NSThread sleepForTimeInterval:0.1];
+      NSLog(@"%ld - %@",ticket, [NSThread currentThread]);
+      ticket -= 1;
+      lastTicket = ticket;
+  });
+
+  //NSOperation & NSOperationQueue
+  //重点：1. 全局的 NSOperationQueue, 所有的操作添加到同一个queue中
+  //       2. 设置 queue 的 maxConcurrentOperationCount 为 1
+  //       3. 如果后续操作需要Block中的结果，就需要调用每个操作的waitUntilFinished，阻塞当前线程，一直等到当前操作完成，才允许执行后面的。waitUntilFinished 要在添加到队列之后！
+  NSBlockOperation *operation = [NSBlockOperation blockOperationWithBlock:^{
+      NSInteger ticket = lastTicket;
+      [NSThread sleepForTimeInterval:1];
+      NSLog(@"%ld - %@",ticket, [NSThread currentThread]);
+      ticket -= 1;
+      lastTicket = ticket;
+  }];
+  [queue addOperation:operation];
+  [operation waitUntilFinished];
+  //后续要做的事
+</PRE>
+
+**延迟执行**
+所谓延迟执行就是延时一段时间再执行某段代码。下面说一些常用方法。
+
+* perform
+<PRE>
+  // 3秒后自动调用self的run:方法，并且传递参数：@"abc"
+  [self performSelector:@selector(run:) withObject:@"abc" afterDelay:3];
+</PRE>
+
+* GCD
+
+可以使用 GCD 中的 dispatch_after 方法，OC 和 Swift 都可以使用，这里只写 OC 的，Swift 的是一样的。
+
+<PRE>
+// 创建队列
+dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+// 设置延时，单位秒
+double delay = 3; 
+dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay * NSEC_PER_SEC)), queue, ^{
+    // 3秒后需要执行的任务
+});
+</PRE>
+
+* NSTimer
+
+NSTimer 是iOS中的一个计时器类，除了延迟执行还有很多用法，不过这里直说延迟执行的用法。同样只写 OC 版的，Swift 也是相同的。
+<PRE>
+[NSTimer scheduledTimerWithTimeInterval:3.0 target:self selector:@selector(run:) userInfo:@"abc" repeats:NO];
+</PRE>
+
+###单例模式
+至于什么是单例模式，我也不多说，我只说说一般怎么实现。在 Objective-C 中，实现单例的方法已经很具体了，虽然有别的方法，但是一般都是用一个标准的方法了，下面来看看。
+
+<PRE>
+@interface Tool : NSObject <NSCopying>
+
++ (instancetype)sharedTool;
+
+@end
+
+@implementation Tool
+
+static id _instance;
+
++ (instancetype)sharedTool {
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        _instance = [[Tool alloc] init];
+    });
+
+    return _instance;
+}
+
+@end
+</PRE>
+
+这里之所以将单例模式，是因为其中用到了 GCD 的 dispatch_once 方法。
+
+###从其他线程回到主线程的方法
+我们都知道在其他线程操作完成后必须到主线程更新UI。所以，介绍完所有的多线程方案后，我们来看看有哪些方法可以回到主线程。
+
+* NSThread
+<PRE>
+//Objective-C
+[self performSelectorOnMainThread:@selector(run) withObject:nil waitUntilDone:NO];
+</PRE>
+* GCD
+<PRE>
+//Objective-C
+dispatch_async(dispatch_get_main_queue(), ^{
+
+});
+</PRE>
+
+* NSOperationQueue
+<PRE>
+//Objective-C
+[[NSOperationQueue mainQueue] addOperationWithBlock:^{
+
+}];
+</PRE>
+
+
+}
